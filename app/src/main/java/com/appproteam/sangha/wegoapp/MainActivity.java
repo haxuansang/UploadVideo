@@ -1,23 +1,25 @@
 package com.appproteam.sangha.wegoapp;
 
 import android.app.ProgressDialog;
+import android.content.Context;
 import android.content.Intent;
 import android.database.Cursor;
-import android.media.MediaPlayer;
 import android.net.Uri;
+import android.os.AsyncTask;
+import android.os.Handler;
 import android.provider.MediaStore;
 import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
-import android.widget.SeekBar;
 import android.widget.Toast;
-import android.net.Uri;
 import android.widget.MediaController;
-import android.widget.VideoView;
 
+import com.appproteam.sangha.wegoapp.ConfigController.JakeController;
+import com.appproteam.sangha.wegoapp.ConfigController.TimeCallback;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -26,14 +28,36 @@ import com.google.firebase.storage.OnProgressListener;
 import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
+import tcking.github.com.giraffeplayer2.GiraffePlayer;
+import tcking.github.com.giraffeplayer2.PlayerManager;
+import tcking.github.com.giraffeplayer2.VideoInfo;
+import tcking.github.com.giraffeplayer2.VideoView;
+import tv.danmaku.ijk.media.player.IjkTimedText;
+
+
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "sangha123";
     private StorageReference mStorageRef;
     private static final int REQUEST_TAKE_GALLERY_VIDEO = 1111;
     private Button btnChoose;
     public ProgressDialog progressDialog;
-    VideoView videoView;
     MediaController mediaController;
-    SeekBar seekBar;
+    VideoView videoView;
+    GiraffePlayer mediaPlayer;
+    private Handler threadHandler = new Handler();
+    public int currentDuration;
+    public boolean pickedtime=false;
+    MyAsync myAsync;
+
+
+
+    @Override
+    protected void onPause() {
+        super.onPause();
+        if (myAsync != null) {
+            myAsync.cancel(true);
+        }
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,73 +70,176 @@ public class MainActivity extends AppCompatActivity {
         progressDialog.setCancelable(false);
         mStorageRef = FirebaseStorage.getInstance().getReference();
         btnChoose = findViewById(R.id.button);
-        seekBar = findViewById(R.id.seekbar);
-        videoView = (VideoView) findViewById(R.id.myVideo);
-        final String vidAddress = "https://firebasestorage.googleapis.com/v0/b/wegoapp-935c3.appspot.com/o/videos%2F16912?alt=media&token=d544757b-4c77-4bab-b5c8-4973f5581c22";
-        videoView.setVideoURI(Uri.parse(vidAddress));
-        videoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
+        final String vidAddress = "https://firebasestorage.googleapis.com/v0/b/wegoapp-935c3.appspot.com/o/videos%2F17182?alt=media&token=43102d94-3cb6-4ba5-ad8a-132029d1d9fa";
+        videoView = (VideoView) findViewById(R.id.video_view);
+        videoView.setVideoPath(vidAddress);
+        mediaPlayer = (GiraffePlayer) videoView.getPlayer();
+        PlayerManager.getInstance().setMediaControllerGenerator(new PlayerManager.MediaControllerGenerator() {
             @Override
-            public void onPrepared(MediaPlayer mp) {
-                int x = videoView.getDuration();
-                seekBar.setMax(x);
-                videoView.start();
-                updateVideoBar();
+            public tcking.github.com.giraffeplayer2.MediaController create(Context context, VideoInfo videoInfo) {
+                return new JakeController(MainActivity.this, new TimeCallback() {
+                    @Override
+                    public void onTimeCallBack(int a) {
+                        Toast.makeText(MainActivity.this, ""+a, Toast.LENGTH_SHORT).show();
+                    }
+                });
+            }
+        }/*new JakeController(this, new TimeCallback() {
+            @Override
+            public void onTimeCallBack(int a) {
+                Toast.makeText(MainActivity.this, ""+a, Toast.LENGTH_SHORT).show();
+            }
+        })*/);
+        //videoView.setPlayerListener(new ProxyPlayerListene)
+        videoView.setPlayerListener(new tcking.github.com.giraffeplayer2.MediaController() {
+            @Override
+            public void bind(VideoView videoView) {
+            }
+
+            @Override
+            public void onPrepared(GiraffePlayer giraffePlayer) {
+                currentDuration = giraffePlayer.getDuration();
+                myAsync = new MyAsync();
+                myAsync.setDuration(currentDuration);
+                myAsync.execute();
+            }
+
+            @Override
+            public void onBufferingUpdate(GiraffePlayer giraffePlayer, int percent) {
+
+               // Log.e(TAG, "current pick  " + giraffePlayer.getCurrentPosition());
+            }
+
+            @Override
+            public boolean onInfo(GiraffePlayer giraffePlayer, int what, int extra) {
+                return false;
+            }
+
+            @Override
+            public void onCompletion(GiraffePlayer giraffePlayer) {
+                if (myAsync != null) {
+                    myAsync.cancel(true);
+                }
+            }
+
+            @Override
+            public void onSeekComplete(GiraffePlayer giraffePlayer) {
+
+            }
+
+            @Override
+            public boolean onError(GiraffePlayer giraffePlayer, int what, int extra) {
+                return false;
+            }
+
+            @Override
+            public void onPause(GiraffePlayer giraffePlayer) {
+
+            }
+
+            @Override
+            public void onRelease(GiraffePlayer giraffePlayer) {
+
+            }
+
+            @Override
+            public void onStart(GiraffePlayer giraffePlayer) {
+                if (currentDuration > 0) {
+                    myAsync = new MyAsync();
+                    myAsync.setDuration(currentDuration);
+                    myAsync.execute();
+                }
+            }
+
+
+            @Override
+            public void onTargetStateChange(int oldState, int newState) {
+
+            }
+
+            @Override
+            public void onCurrentStateChange(int oldState, int newState) {
+
+            }
+
+            @Override
+            public void onDisplayModelChange(int oldModel, int newModel) {
+
+            }
+
+            @Override
+            public void onPreparing(GiraffePlayer giraffePlayer) {
+                Log.e(TAG, "onPreparing: " +giraffePlayer.getCurrentPosition() );
+            }
+
+            @Override
+            public void onTimedText(GiraffePlayer giraffePlayer, IjkTimedText text) {
+
+            }
+
+            @Override
+            public void onLazyLoadProgress(GiraffePlayer giraffePlayer, int progress) {
+
+            }
+
+            @Override
+            public void onLazyLoadError(GiraffePlayer giraffePlayer, String message) {
 
             }
         });
 
-        /*mediaController.setAnchorView(videoView);
-        mediaController.requestFocus();
-        videoView.setMediaController(mediaController);*/
+
+
         btnChoose.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 chooseVideo();
             }
         });
-
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
-            @Override
-            public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
-                if (fromUser) {
-                    videoView.seekTo(progress);
-                     videoView.start();
-                }
-            }
-
-            @Override
-            public void onStartTrackingTouch(SeekBar seekBar) {
-
-            }
-
-            @Override
-            public void onStopTrackingTouch(SeekBar seekBar) {
-
-            }
-        });
-
-
-
     }
 
-    private void updateVideoBar() {
-        new Thread(new Runnable() {
-            public void run() {
-                do{
-                    seekBar.post(new Runnable() {
-                        public void run() {
-                            seekBar.setProgress(videoView.getCurrentPosition());
-                        }
-                    });
-                    try {
-                        Thread.sleep(200);
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
+
+    private class MyAsync extends AsyncTask<Void, Integer, Void> {
+
+        int current;
+        int duration;
+
+        public MyAsync() {
+        }
+
+        public void setDuration(int duration) {
+            this.duration = duration;
+        }
+
+        @Override
+        protected Void doInBackground(Void... params) {
+
+            do {
+                current = mediaPlayer.getCurrentPosition();
+                try {
+                    publishProgress((int) (current));
+                } catch (Exception e) {
                 }
-                while(true);
+
+                try {
+                    Thread.sleep(400);
+                } catch (Exception e) {
+                }
             }
-        }).start();
+            while (!isCancelled());
+            return null;
+
+        }
+
+        @Override
+        protected void onProgressUpdate(Integer... values) {
+            super.onProgressUpdate(values);
+            Log.d(TAG, "onProgressUpdate: " + values[0]);
+            Log.d(TAG, "onProgressUpdate: current " + mediaPlayer.getCurrentPosition());
+            if (current < duration) {
+                onCancelled();
+            }
+        }
     }
 
     private void chooseVideo() {
@@ -147,9 +274,9 @@ public class MainActivity extends AppCompatActivity {
                 result.addOnSuccessListener(new OnSuccessListener<Uri>() {
                     @Override
                     public void onSuccess(Uri uri) {
-                        videoView.setVideoURI(uri);
+                     /*   videoView.setVideoURI(uri);
                         videoView.setVisibility(View.VISIBLE);
-                        videoView.start();
+                        videoView.start();*/
                     }
                 });
             }
