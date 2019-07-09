@@ -21,6 +21,24 @@ import android.net.Uri;
 import android.widget.MediaController;
 import android.widget.VideoView;
 
+import com.google.android.exoplayer2.DefaultLoadControl;
+import com.google.android.exoplayer2.DefaultRenderersFactory;
+import com.google.android.exoplayer2.ExoPlaybackException;
+import com.google.android.exoplayer2.ExoPlayer;
+import com.google.android.exoplayer2.ExoPlayerFactory;
+import com.google.android.exoplayer2.PlaybackParameters;
+import com.google.android.exoplayer2.Player;
+import com.google.android.exoplayer2.SimpleExoPlayer;
+import com.google.android.exoplayer2.Timeline;
+import com.google.android.exoplayer2.source.ExtractorMediaSource;
+import com.google.android.exoplayer2.source.MediaSource;
+import com.google.android.exoplayer2.source.TrackGroupArray;
+import com.google.android.exoplayer2.trackselection.DefaultTrackSelector;
+import com.google.android.exoplayer2.trackselection.TrackSelectionArray;
+import com.google.android.exoplayer2.ui.PlayerView;
+import com.google.android.exoplayer2.upstream.DefaultHttpDataSourceFactory;
+import com.google.android.exoplayer2.util.EventLogger;
+import com.google.android.exoplayer2.util.Util;
 import com.google.android.gms.tasks.OnFailureListener;
 import com.google.android.gms.tasks.OnSuccessListener;
 import com.google.android.gms.tasks.Task;
@@ -35,16 +53,152 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_TAKE_GALLERY_VIDEO = 1111;
     private Button btnChoose;
     public ProgressDialog progressDialog;
-    VideoView videoView;
     MediaController mediaController;
     SeekBar seekBar;
-    private TextView runningTime;
-    private ImageView imvPlay;
+    private PlayerView playerView;
+    private boolean playWhenReady;
+    private int currentWindow=0;
+    private long playbackPosition=0;
+    final String vidAddress = "https://firebasestorage.googleapis.com/v0/b/wegoapp-935c3.appspot.com/o/videos%2F15994?alt=media&token=8ec9dfce-4eed-4912-a22d-af991d1ee67a";
+    private SimpleExoPlayer player;
+    private MediaSource buildMediaSource(Uri uri) {
+        return new ExtractorMediaSource.Factory(
+                new DefaultHttpDataSourceFactory("exoplayer-codelab")).
+                createMediaSource(uri);
+    }
 
+    private void initializePlayer() {
+        player = ExoPlayerFactory.newSimpleInstance(
+                new DefaultRenderersFactory(this),
+                new DefaultTrackSelector(), new DefaultLoadControl());
+        updateVideoBar();
+        player.addListener(new Player.EventListener() {
+            @Override
+            public void onTimelineChanged(Timeline timeline, Object manifest, int reason) {
+
+            }
+
+            @Override
+            public void onTracksChanged(TrackGroupArray trackGroups, TrackSelectionArray trackSelections) {
+
+            }
+
+            @Override
+            public void onLoadingChanged(boolean isLoading) {
+
+            }
+
+            @Override
+            public void onPlayerStateChanged(boolean playWhenReady, int playbackState) {
+
+                if (playbackState == ExoPlayer.STATE_ENDED) {
+                    Log.e(TAG, "onPlayerStateChanged: 1" );
+                    Toast.makeText(getApplicationContext(), "Playback ended", Toast.LENGTH_LONG).show();
+                }
+                else if (playbackState == ExoPlayer.STATE_BUFFERING)
+                {
+                    Log.e(TAG, "onPlayerStateChanged: 2" );
+                    Toast.makeText(getApplicationContext(), "Buffering..", Toast.LENGTH_SHORT).show();
+                }
+                else if (playbackState == ExoPlayer.STATE_READY)
+                {
+
+                    Log.e(TAG, "onPlayerStateChanged: 3" );
+                }
+
+            }
+
+            @Override
+            public void onRepeatModeChanged(int repeatMode) {
+
+            }
+
+            @Override
+            public void onShuffleModeEnabledChanged(boolean shuffleModeEnabled) {
+
+            }
+
+            @Override
+            public void onPlayerError(ExoPlaybackException error) {
+
+            }
+
+            @Override
+            public void onPositionDiscontinuity(int reason) {
+
+            }
+
+            @Override
+            public void onPlaybackParametersChanged(PlaybackParameters playbackParameters) {
+
+            }
+
+            @Override
+            public void onSeekProcessed() {
+
+            }
+        });
+        playerView.setPlayer(player);
+        player.setPlayWhenReady(playWhenReady);
+        player.seekTo(currentWindow, playbackPosition);
+        Uri uri = Uri.parse(vidAddress);
+        MediaSource mediaSource = buildMediaSource(uri);
+        player.prepare(mediaSource, true, false);
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        if (Util.SDK_INT > 23) {
+            initializePlayer();
+        }
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        hideSystemUi();
+
+    }
+    private void hideSystemUi() {
+        playerView.setSystemUiVisibility(View.SYSTEM_UI_FLAG_LOW_PROFILE
+                | View.SYSTEM_UI_FLAG_FULLSCREEN
+                | View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+                | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION);
+    }
+    @Override
+    public void onPause() {
+        super.onPause();
+        if (Util.SDK_INT <= 23) {
+            releasePlayer();
+        }
+    }
+
+    @Override
+    public void onStop() {
+        super.onStop();
+        if (Util.SDK_INT > 23) {
+            releasePlayer();
+        }
+    }
+
+
+    private void releasePlayer() {
+        if (player != null) {
+            playbackPosition = player.getCurrentPosition();
+            currentWindow = player.getCurrentWindowIndex();
+            playWhenReady = player.getPlayWhenReady();
+            player.release();
+            player = null;
+        }
+    }
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+        playerView = findViewById(R.id.myVideo);
         mediaController = new MediaController(this);
         progressDialog = new ProgressDialog(this);
         progressDialog.setTitle("Uploading Video");
@@ -52,14 +206,13 @@ public class MainActivity extends AppCompatActivity {
         progressDialog.setCancelable(false);
         mStorageRef = FirebaseStorage.getInstance().getReference();
         btnChoose = findViewById(R.id.button);
-        seekBar = findViewById(R.id.seekbar);
-        videoView = (VideoView) findViewById(R.id.myVideo);
+
+      /*  seekBar = findViewById(R.id.seekbar);
         runningTime = (TextView) findViewById(R.id.runningTime);
-        imvPlay = (ImageView) findViewById(R.id.controlVideo);
-        runningTime.setText("00:00");
-        final String vidAddress = "https://firebasestorage.googleapis.com/v0/b/wegoapp-935c3.appspot.com/o/videos%2F16912?alt=media&token=d544757b-4c77-4bab-b5c8-4973f5581c22";
-        videoView.setVideoURI(Uri.parse(vidAddress));
-        imvPlay.setOnClickListener(new View.OnClickListener() {
+        imvPlay = (ImageView) findViewById(R.id.controlVideo);*/
+       // runningTime.setText("00:00");
+       // videoView.setVideoURI(Uri.parse(vidAddress));
+      /*  imvPlay.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
                 if (videoView != null) {
@@ -95,7 +248,7 @@ public class MainActivity extends AppCompatActivity {
 
             }
         });
-
+*/
         btnChoose.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -103,7 +256,7 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-        seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
+   /*     seekBar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) {
@@ -122,61 +275,23 @@ public class MainActivity extends AppCompatActivity {
             public void onStopTrackingTouch(SeekBar seekBar) {
                 videoView.seekTo(seekBar.getProgress());
             }
-        });
+        });*/
 
 
     }
 
-    private Runnable refreshTime = new Runnable() {
-        @Override
-        public void run() {
-            seekBar.setProgress(videoView.getCurrentPosition());
-            if (videoView.isPlaying())
-                videoView.postDelayed(refreshTime, 1000);
-            int time = videoView.getCurrentPosition() / 1000;
-            int minute = time / 60;
-            int second = time % 60;
-            if (minute < 10) {
-                if (second < 10)
-                    runningTime.setText("0" + minute + ":0" + second);
-                else
-                    runningTime.setText("0" + minute + ":" + second);
-            } else {
-                if (second < 10)
-                runningTime.setText(minute + ":0" + second);
-                else
-                runningTime.setText(minute + ":" + second);
-            }
-
-
-        }
-    };
 
     private void updateVideoBar() {
         new Thread(new Runnable() {
             public void run() {
                 do {
-                    seekBar.post(new Runnable() {
+                    playerView.post(new Runnable() {
                         public void run() {
-                            seekBar.setProgress(videoView.getCurrentPosition());
-                            int time = videoView.getCurrentPosition() / 1000;
-                            int minute = time / 60;
-                            int second = time % 60;
-                            if (minute < 10) {
-                                if (second < 10)
-                                    runningTime.setText("0" + minute + ":0" + second);
-                                else
-                                    runningTime.setText("0" + minute + ":" + second);
-                            } else {
-                                if (second < 10)
-                                    runningTime.setText(minute + ":0" + second);
-                                else
-                                    runningTime.setText(minute + ":" + second);
-                            }
+                            Log.e(TAG, "run: "+ player.getCurrentPosition());
                         }
                     });
                     try {
-                        Thread.sleep(200);
+                        Thread.sleep(1000);
                     } catch (InterruptedException e) {
                         e.printStackTrace();
                     }
@@ -218,9 +333,7 @@ public class MainActivity extends AppCompatActivity {
                 result.addOnSuccessListener(new OnSuccessListener<Uri>() {
                     @Override
                     public void onSuccess(Uri uri) {
-                        videoView.setVideoURI(uri);
-                        videoView.setVisibility(View.VISIBLE);
-                        videoView.start();
+
                     }
                 });
             }
