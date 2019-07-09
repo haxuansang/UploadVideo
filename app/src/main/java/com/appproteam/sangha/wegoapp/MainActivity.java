@@ -10,9 +10,12 @@ import android.support.annotation.NonNull;
 import android.support.annotation.Nullable;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.SeekBar;
+import android.widget.TextView;
 import android.widget.Toast;
 import android.net.Uri;
 import android.widget.MediaController;
@@ -27,6 +30,7 @@ import com.google.firebase.storage.StorageReference;
 import com.google.firebase.storage.UploadTask;
 
 public class MainActivity extends AppCompatActivity {
+    private static final String TAG = "sangha123";
     private StorageReference mStorageRef;
     private static final int REQUEST_TAKE_GALLERY_VIDEO = 1111;
     private Button btnChoose;
@@ -34,6 +38,8 @@ public class MainActivity extends AppCompatActivity {
     VideoView videoView;
     MediaController mediaController;
     SeekBar seekBar;
+    private TextView runningTime;
+    private ImageView imvPlay;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,22 +54,48 @@ public class MainActivity extends AppCompatActivity {
         btnChoose = findViewById(R.id.button);
         seekBar = findViewById(R.id.seekbar);
         videoView = (VideoView) findViewById(R.id.myVideo);
+        runningTime = (TextView) findViewById(R.id.runningTime);
+        imvPlay = (ImageView) findViewById(R.id.controlVideo);
+        runningTime.setText("00:00");
         final String vidAddress = "https://firebasestorage.googleapis.com/v0/b/wegoapp-935c3.appspot.com/o/videos%2F16912?alt=media&token=d544757b-4c77-4bab-b5c8-4973f5581c22";
         videoView.setVideoURI(Uri.parse(vidAddress));
+        imvPlay.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View view) {
+                if (videoView != null) {
+                    if (videoView.isPlaying()) {
+                        Log.e(TAG, "onClick: 1");
+                        videoView.pause();
+                        imvPlay.setImageResource(R.drawable.ic_play);
+                    } else {
+                        Log.e(TAG, "onClick: 2");
+                        if (videoView.isPlaying())
+                            videoView.resume();
+                        else
+                            videoView.start();
+                        imvPlay.setImageResource(R.drawable.ic_pause);
+                    }
+                }
+
+            }
+        });
         videoView.setOnPreparedListener(new MediaPlayer.OnPreparedListener() {
             @Override
             public void onPrepared(MediaPlayer mp) {
                 int x = videoView.getDuration();
                 seekBar.setMax(x);
-                videoView.start();
                 updateVideoBar();
+            }
+        });
+
+        videoView.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
+            @Override
+            public void onCompletion(MediaPlayer mediaPlayer) {
+                imvPlay.setImageResource(R.drawable.ic_play);
 
             }
         });
 
-        /*mediaController.setAnchorView(videoView);
-        mediaController.requestFocus();
-        videoView.setMediaController(mediaController);*/
         btnChoose.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
@@ -76,7 +108,8 @@ public class MainActivity extends AppCompatActivity {
             public void onProgressChanged(SeekBar seekBar, int progress, boolean fromUser) {
                 if (fromUser) {
                     videoView.seekTo(progress);
-                     videoView.start();
+                    videoView.start();
+                    imvPlay.setImageResource(R.drawable.ic_pause);
                 }
             }
 
@@ -87,21 +120,59 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onStopTrackingTouch(SeekBar seekBar) {
-
+                videoView.seekTo(seekBar.getProgress());
             }
         });
 
 
-
     }
+
+    private Runnable refreshTime = new Runnable() {
+        @Override
+        public void run() {
+            seekBar.setProgress(videoView.getCurrentPosition());
+            if (videoView.isPlaying())
+                videoView.postDelayed(refreshTime, 1000);
+            int time = videoView.getCurrentPosition() / 1000;
+            int minute = time / 60;
+            int second = time % 60;
+            if (minute < 10) {
+                if (second < 10)
+                    runningTime.setText("0" + minute + ":0" + second);
+                else
+                    runningTime.setText("0" + minute + ":" + second);
+            } else {
+                if (second < 10)
+                runningTime.setText(minute + ":0" + second);
+                else
+                runningTime.setText(minute + ":" + second);
+            }
+
+
+        }
+    };
 
     private void updateVideoBar() {
         new Thread(new Runnable() {
             public void run() {
-                do{
+                do {
                     seekBar.post(new Runnable() {
                         public void run() {
                             seekBar.setProgress(videoView.getCurrentPosition());
+                            int time = videoView.getCurrentPosition() / 1000;
+                            int minute = time / 60;
+                            int second = time % 60;
+                            if (minute < 10) {
+                                if (second < 10)
+                                    runningTime.setText("0" + minute + ":0" + second);
+                                else
+                                    runningTime.setText("0" + minute + ":" + second);
+                            } else {
+                                if (second < 10)
+                                    runningTime.setText(minute + ":0" + second);
+                                else
+                                    runningTime.setText(minute + ":" + second);
+                            }
                         }
                     });
                     try {
@@ -110,7 +181,7 @@ public class MainActivity extends AppCompatActivity {
                         e.printStackTrace();
                     }
                 }
-                while(true);
+                while (true);
             }
         }).start();
     }

@@ -8,20 +8,45 @@
         android:id="@+id/myVideo"
         android:layout_width="wrap_content"
         android:layout_height="300dp"
-        android:layout_centerHorizontal="true"/>
+        android:layout_centerHorizontal="true" />
+
     <SeekBar
-        android:layout_marginTop="20dp"
         android:id="@+id/seekbar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_above="@id/button"
-      />
+        android:layout_below="@id/myVideo"
+        android:layout_marginTop="20dp"
+        android:layout_toRightOf="@id/runningTime" />
+
+    <ImageView
+        android:id="@+id/controlVideo"
+        android:layout_width="30dp"
+        android:layout_height="30dp"
+        android:layout_below="@id/myVideo"
+        android:layout_alignParentStart="true"
+        android:layout_alignParentLeft="true"
+        android:layout_marginTop="15dp"
+        android:src="@drawable/ic_play"
+        android:layout_centerVertical="true"
+        android:layout_marginLeft="10dp"/>
+    <TextView
+        android:id="@+id/runningTime"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/myVideo"
+        android:layout_marginTop="20dp"
+        android:layout_toRightOf="@id/controlVideo"
+        android:text="00:00"
+        android:textColor="@android:color/black"
+        android:textSize="16dp"
+        android:layout_marginLeft="10dp"/>
+
     <Button
-        android:layout_marginTop="10dp"
         android:id="@+id/button"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Choose"
         android:layout_alignParentBottom="true"
-        android:layout_centerHorizontal="true"/>
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="10dp"
+        android:text="Choose" />
 </RelativeLayout>
